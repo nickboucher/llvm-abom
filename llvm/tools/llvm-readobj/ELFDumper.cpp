@@ -27,6 +27,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/AMDGPUMetadataVerifier.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
@@ -221,6 +222,7 @@ public:
   void printArchSpecificInfo() override;
   void printStackMap() const override;
   void printMemtag() override;
+  void printAbom() override;
   ArrayRef<uint8_t> getMemtagGlobalsSectionContents(uint64_t ExpectedAddr);
 
   // Hash histogram shows statistics of how efficient the hash was for the
@@ -6007,6 +6009,57 @@ static void processNotesHelper(
           "unable to read notes from the PT_NOTE segment with index " +
           Twine(I) + ": " + toString(std::move(Err)));
     FinishNotesFn();
+  }
+}
+
+template <class ELFT> void ELFDumper<ELFT>::printAbom() {
+  std::vector<object::SectionRef> sections;
+  for (auto Section : ObjF.sections()) {
+    Expected<StringRef> Name = Section.getName();
+    if (!Name) {
+      handleAllErrors(createFileError("ELF", Name.takeError()),
+          [&](const ErrorInfoBase &EI) { llvm::errs() << EI.message(); });
+      return;
+    }
+    if (*Name == ".abom") {
+      sections.push_back(Section);
+    }
+  }
+  if (sections.empty()) {
+    WithColor::error(errs()) << "No .abom section found.\n";
+    return;
+  }
+  if (sections.size() > 1) {
+    WithColor::error(errs()) << "Multiple .abom sections found.\n";
+    return;
+  }
+  Expected<StringRef> Contents = sections[0].getContents();
+  if (!Contents) {
+    handleAllErrors(createFileError("ELF", Contents.takeError()),
+        [&](const ErrorInfoBase &EI) { llvm::errs() << EI.message(); });
+    return;
+  }
+  ABOM::ABOMHeader header;
+  for (size_t i=0; i<sizeof(ABOM::ABOMHeader); i++) {
+      ((uint8_t *)&header)[i] = (*Contents)[i];
+  }
+  if (header.magic[0] != 'A' || header.magic[1] != 'B' ||
+      header.magic[2] != 'O' || header.magic[3] != 'M') {
+      WithColor::error(errs()) << "Invalid ABOM header.";
+      return;
+  }
+  if (header.version != 1) {
+      WithColor::error(errs()) << "Unsupported ABOM version: "
+          + std::to_string(header.version) + "\n";
+      return;
+  }
+  llvm::outs() << "\nABOM version: " << std::to_string(header.version) << "\n";
+  llvm::outs() << "ABOM num filters: " << header.numFilters << "\n";
+  llvm::outs() << "ABOM model: " << header.model << "\n";
+  llvm::outs() << "ABOM blob size: " << header.blobSize << "\n";
+
+  if (header.blobSize != (*Contents).size() - sizeof(ABOM::ABOMHeader)) {
+    WithColor::warning(errs()) << "ABOM blob size does not match header.\n";
   }
 }
 

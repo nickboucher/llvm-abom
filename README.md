@@ -25,6 +25,26 @@ If `lld` is not the default linker on your system, you can specify it using the 
 clang -fabom -fuse-ld=lld -o hello hello.c
 ```
 
+## Examining an ABOM
+
+To examine an ABOM contained within a binary, leverage the `llvm-readobj` tool:
+```sh
+llvm-readobj -abom hello
+```
+This will output information about the ABOM header:
+```
+File: hello
+Format: elf64-x86-64
+Arch: x86_64
+AddressSize: 64bit
+LoadName: <Not found>
+
+ABOM version: 1
+ABOM num filters: 0
+ABOM model: 0
+ABOM blob size: 1
+```
+
 ## Acknowledgements
 
 Thank you to:

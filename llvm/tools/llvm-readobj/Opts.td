@@ -62,6 +62,7 @@ def notes : FF<"notes", "Display notes">, Group<grp_elf>;
 def program_headers : FF<"program-headers", "Display program headers">, Group<grp_elf>;
 def raw_relr : FF<"raw-relr", "Do not decode relocations in SHT_RELR section, display raw contents">, Group<grp_elf>;
 def version_info : FF<"version-info", "Display version sections">, Group<grp_elf>;
+def abom : FF<"abom", "Display the ABOM information">, Group<grp_elf>;
 
 // Mach-O specific options.
 def grp_mach_o : OptionGroup<"kind">, HelpText<"OPTIONS (Mach-O specific)">;

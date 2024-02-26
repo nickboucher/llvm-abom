@@ -135,6 +135,7 @@ static bool ProgramHeaders;
 bool RawRelr;
 static bool SectionGroups;
 static bool VersionInfo;
+static bool Abom;
 
 // Mach-O specific options.
 static bool MachODataInCode;
@@ -263,6 +264,7 @@ static void parseOptions(const opt::InputArgList &Args) {
   opts::Memtag = Args.hasArg(OPT_memtag);
   opts::NeededLibraries = Args.hasArg(OPT_needed_libs);
   opts::Notes = Args.hasArg(OPT_notes);
+  opts::Abom = Args.hasArg(OPT_abom);
   opts::PrettyPrint = Args.hasArg(OPT_pretty_print);
   opts::ProgramHeaders = Args.hasArg(OPT_program_headers);
   opts::RawRelr = Args.hasArg(OPT_raw_relr);
@@ -471,6 +473,8 @@ static void dumpObject(ObjectFile &Obj, ScopedPrinter &Writer,
       Dumper->printNotes();
     if (opts::Memtag)
       Dumper->printMemtag();
+    if (opts::Abom)
+      Dumper->printAbom();
   }
   if (Obj.isCOFF()) {
     if (opts::COFFImports)

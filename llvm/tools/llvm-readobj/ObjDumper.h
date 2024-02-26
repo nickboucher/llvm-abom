@@ -137,6 +137,7 @@ public:
   virtual void printSectionDetails() {}
   virtual void printArchSpecificInfo() {}
   virtual void printMemtag() {}
+  virtual void printAbom() {}
 
   // Only implemented for PE/COFF.
   virtual void printCOFFImports() { }
