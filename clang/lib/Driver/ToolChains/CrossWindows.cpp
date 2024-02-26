@@ -166,6 +166,7 @@ void tools::CrossWindows::Linker::ConstructJob(
 
   Args.AddAllArgs(CmdArgs, options::OPT_L);
   TC.AddFilePathLibArgs(Args, CmdArgs);
+TC.AddAbomFlag(Args, CmdArgs);
   AddLinkerInputs(TC, Inputs, Args, CmdArgs, JA);
 
   if (TC.ShouldLinkCXXStdlib(Args)) {

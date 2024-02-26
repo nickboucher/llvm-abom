@@ -205,6 +205,11 @@ public:
   /// if non-empty.
   std::string RecordCommandLine;
 
+  /// List of dependent source/header files.
+  /// This is shared with DependencyOuputOptions.
+  /// This has same contents as Dependencies in DependencyCollector.
+  std::shared_ptr<std::vector<std::string>> AbomDependencies;
+
   llvm::SmallVector<std::pair<std::string, std::string>, 0> DebugPrefixMap;
 
   /// Prefix replacement map for source-based code coverage to remap source

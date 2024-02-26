@@ -25,12 +25,15 @@
 #include "Symbols.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/StringTableBuilder.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/Parallel.h"
 #include "llvm/Support/Threading.h"
+#include <vector>
+#include <cstdint>
 
 namespace lld::elf {
 class Defined;
@@ -994,6 +997,19 @@ private:
   size_t shardOffsets[numShards];
 };
 
+// .abom section.
+template <class ELFT> class AbomSection final : public SyntheticSection {
+
+public:
+  static std::unique_ptr<AbomSection> create();
+  AbomSection(llvm::ABOM::ABOM &abom);
+  size_t getSize() const override { return serializedAbom.size(); }
+  void writeTo(uint8_t *buf) override;
+
+private:
+  std::vector<uint8_t> serializedAbom;
+};
+
 // .MIPS.abiflags section.
 template <class ELFT>
 class MipsAbiFlagsSection final : public SyntheticSection {
@@ -1340,6 +1356,7 @@ struct InStruct {
   std::unique_ptr<SyntheticSection> riscvAttributes;
   std::unique_ptr<BssSection> bss;
   std::unique_ptr<BssSection> bssRelRo;
+  std::unique_ptr<SyntheticSection> abom;
   std::unique_ptr<GotSection> got;
   std::unique_ptr<GotPltSection> gotPlt;
   std::unique_ptr<IgotPltSection> igotPlt;

@@ -110,6 +110,7 @@ public:
                                         const TargetMachine &TM) const override;
 
   MCSection *getSectionForCommandLines() const override;
+  MCSection *getSectionForAbom() const override;
 };
 
 class TargetLoweringObjectFileMachO : public TargetLoweringObjectFile {

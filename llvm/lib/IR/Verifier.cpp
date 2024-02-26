@@ -463,6 +463,7 @@ public:
     visitModuleFlags();
     visitModuleIdents();
     visitModuleCommandLines();
+    visitModuleAbom();
 
     verifyCompileUnits();
 
@@ -490,6 +491,7 @@ private:
   void visitDIArgList(const DIArgList &AL, Function *F);
   void visitComdat(const Comdat &C);
   void visitModuleIdents();
+  void visitModuleAbom();
   void visitModuleCommandLines();
   void visitModuleFlags();
   void visitModuleFlag(const MDNode *Op,
@@ -1651,6 +1653,24 @@ void Verifier::visitModuleIdents() {
           ("invalid value for llvm.ident metadata entry operand"
            "(the operand should be a string)"),
           N->getOperand(0));
+  }
+}
+
+void Verifier::visitModuleAbom() {
+  const NamedMDNode *CommandLines = M.getNamedMetadata(".abom");
+  if (!CommandLines)
+    return;
+
+  // .abom takes a list of metadata entry. Each entry has only one
+  // string. Scan each .abom entry and make sure that this
+  // requirement is met.
+  for (const MDNode *N : CommandLines->operands()) {
+    Check(N->getNumOperands() == 1,
+           "incorrect number of operands in .abom metadata", N);
+    Check(dyn_cast_or_null<MDString>(N->getOperand(0)),
+           ("invalid value for .abom metadata entry operand"
+            "(the operand should be a string)"),
+           N->getOperand(0));
   }
 }
 

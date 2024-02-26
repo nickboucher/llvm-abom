@@ -240,6 +240,7 @@ struct Config {
   bool fortranCommon;
   bool gcSections;
   bool gdbIndex;
+  bool abom = false;
   bool gnuHash = false;
   bool gnuUnique;
   bool hasDynSymTab;

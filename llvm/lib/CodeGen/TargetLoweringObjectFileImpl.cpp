@@ -1156,6 +1156,12 @@ const MCExpr *TargetLoweringObjectFileELF::lowerDSOLocalEquivalent(
                                  getContext());
 }
 
+MCSection *TargetLoweringObjectFileELF::getSectionForAbom() const {
+  // .abom
+  return getContext().getELFSection(".abom", ELF::SHT_PROGBITS, ELF::SHF_MERGE,
+                                    1);
+}
+
 MCSection *TargetLoweringObjectFileELF::getSectionForCommandLines() const {
   // Use ".GCC.command.line" since this feature is to support clang's
   // -frecord-gcc-switches which in turn attempts to mimic GCC's switch of the

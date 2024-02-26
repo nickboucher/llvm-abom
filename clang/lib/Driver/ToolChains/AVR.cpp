@@ -463,6 +463,7 @@ void AVR::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   // Add library search paths before we specify libraries.
   Args.AddAllArgs(CmdArgs, options::OPT_L);
   getToolChain().AddFilePathLibArgs(Args, CmdArgs);
+getToolChain().AddAbomFlag(Args, CmdArgs);
 
   // Currently we only support libgcc and compiler-rt.
   auto RtLib = TC.GetRuntimeLibType(Args);

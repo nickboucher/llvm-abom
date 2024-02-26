@@ -7369,6 +7369,12 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   const char *Exec = D.getClangProgramPath();
 
+  bool AbomSwitches = Args.hasFlag(
+      options::OPT_fabom, options::OPT_fno_abom, false);
+  if (AbomSwitches) {
+    CmdArgs.push_back("-emit-abom");
+  }
+
   // Optionally embed the -cc1 level arguments into the debug info or a
   // section, for build analysis.
   // Also record command line arguments into the debug info if

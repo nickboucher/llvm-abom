@@ -228,6 +228,7 @@ void tools::MinGW::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.AddAllArgs(CmdArgs, options::OPT_L);
   TC.AddFilePathLibArgs(Args, CmdArgs);
+TC.AddAbomFlag(Args, CmdArgs);
 
   // Add the compiler-rt library directories if they exist to help
   // the linker find the various sanitizer, builtin, and profiling runtimes.

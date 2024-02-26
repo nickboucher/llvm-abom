@@ -90,11 +90,39 @@ public:
 protected:
   /// Return true if the filename was added to the list of dependencies, false
   /// otherwise.
-  bool addDependency(StringRef Filename);
+  virtual bool addDependency(StringRef Filename);
 
 private:
   llvm::StringSet<> Seen;
   std::vector<std::string> Dependencies;
+};
+
+// Class to collect the dependencies of a compilation for ABOM construction.
+class AbomDependencyGenerator : public DependencyCollector {
+public:
+  AbomDependencyGenerator(const DependencyOutputOptions &Opts);
+
+  void attachToPreprocessor(Preprocessor &PP) override;
+
+  bool addDependency(StringRef Filename) override;
+
+  void finishedMainFile(DiagnosticsEngine &Diags) override{};
+
+  bool needSystemDependencies() final override { return true; }
+
+  bool sawDependency(StringRef Filename, bool FromModule, bool IsSystem,
+                     bool IsModuleFile, bool IsMissing) final override;
+
+  ArrayRef<std::string> getDependencies() const { return *AbomDependencies; }
+
+  void setDependenciesPtr(std::shared_ptr<std::vector<std::string>> Deps) {
+    AbomDependencies = Deps;
+  }
+
+private:
+  std::shared_ptr<std::vector<std::string>> AbomDependencies;
+  bool AddMissingHeaderDeps;
+  bool IncludeModuleFiles;
 };
 
 /// Builds a dependency file when attached to a Preprocessor (for includes) and

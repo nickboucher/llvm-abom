@@ -32,6 +32,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugPubTable.h"
@@ -88,6 +89,29 @@ MergeInputSection *elf::createCommentSection() {
                                       getVersion(), ".comment");
   sec->splitIntoPieces();
   return sec;
+}
+
+template <class ELFT>
+AbomSection<ELFT>::AbomSection(llvm::ABOM::ABOM &abom)
+    : SyntheticSection(0, llvm::ELF::SHT_NOTE, 1, ".abom") {
+      serializedAbom = abom.serialize();
+    }
+
+template <class ELFT> void AbomSection<ELFT>::writeTo(uint8_t *buf) {
+  memcpy(buf, serializedAbom.data(), serializedAbom.size());
+}
+
+template <class ELFT>
+std::unique_ptr<AbomSection<ELFT>> AbomSection<ELFT>::create() {
+  auto abom = llvm::ABOM::ABOM();
+  // Iterate input sections to find .abom section
+  for (InputSectionBase *sec : ctx.inputSections) {
+    if (sec->name == ".abom") {
+      sec->markDead();
+      abom |= llvm::ABOM::ABOM::deserialize(sec->content());
+    }
+  }
+  return std::make_unique<AbomSection<ELFT>>(abom);
 }
 
 // .MIPS.abiflags section.
@@ -3840,6 +3864,7 @@ void InStruct::reset() {
   riscvAttributes.reset();
   bss.reset();
   bssRelRo.reset();
+  abom.reset();
   got.reset();
   gotPlt.reset();
   igotPlt.reset();
@@ -3994,6 +4019,11 @@ template void elf::splitSections<ELF32LE>();
 template void elf::splitSections<ELF32BE>();
 template void elf::splitSections<ELF64LE>();
 template void elf::splitSections<ELF64BE>();
+
+template class elf::AbomSection<ELF32LE>;
+template class elf::AbomSection<ELF32BE>;
+template class elf::AbomSection<ELF64LE>;
+template class elf::AbomSection<ELF64BE>;
 
 template class elf::MipsAbiFlagsSection<ELF32LE>;
 template class elf::MipsAbiFlagsSection<ELF32BE>;

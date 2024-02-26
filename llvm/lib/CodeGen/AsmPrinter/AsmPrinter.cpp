@@ -2471,6 +2471,9 @@ bool AsmPrinter::doFinalization(Module &M) {
   if (!TM.getTargetTriple().isOSBinFormatXCOFF())
     emitModuleCommandLines(M);
 
+  // Emit bytes for .abom metadata
+  emitModuleAbom(M);
+
   // Emit .note.GNU-split-stack and .note.GNU-no-split-stack sections if
   // split-stack is used.
   if (TM.getTargetTriple().isOSBinFormatELF() && HasSplitStack) {
@@ -2995,6 +2998,28 @@ void AsmPrinter::emitModuleIdents(Module &M) {
       OutStreamer->emitIdent(S->getString());
     }
   }
+}
+
+void AsmPrinter::emitModuleAbom(Module &M) {
+  MCSection *Abom = getObjFileLowering().getSectionForAbom();
+  if (!Abom)
+    return;
+
+  const NamedMDNode *NMD = M.getNamedMetadata(".abom");
+  if (!NMD || !NMD->getNumOperands())
+    return;
+
+  OutStreamer->pushSection();
+  OutStreamer->switchSection(Abom);
+
+  for (unsigned i = 0, e = NMD->getNumOperands(); i != e; ++i) {
+    const MDNode *N = NMD->getOperand(i);
+    assert(N->getNumOperands() == 1 &&
+           ".abom metadata entry can have only one operand");
+    const MDString *S = cast<MDString>(N->getOperand(0));
+    OutStreamer->emitBytes(S->getString());
+  }
+  OutStreamer->popSection();
 }
 
 void AsmPrinter::emitModuleCommandLines(Module &M) {

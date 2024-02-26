@@ -1726,6 +1726,12 @@ private:
   /// Emit the Clang commandline as llvm.commandline metadata.
   void EmitCommandLineMetadata();
 
+  /// Emit .abom section in the output.
+  void EmitAbom();
+
+  /// Compute the ABOM for the given dependencies.
+  std::string ComputeAbom(std::vector<std::string> &Deps);
+
   /// Emit the module flag metadata used to pass options controlling the
   /// the backend to LLVM.
   void EmitBackendOptionsMetadata(const CodeGenOptions &CodeGenOpts);

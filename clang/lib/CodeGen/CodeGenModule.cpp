@@ -52,6 +52,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/Frontend/OpenMP/OMPIRBuilder.h"
 #include "llvm/IR/AttributeMask.h"
 #include "llvm/IR/CallingConv.h"
@@ -1277,6 +1278,9 @@ void CodeGenModule::Release() {
 
   if (!getCodeGenOpts().RecordCommandLine.empty())
     EmitCommandLineMetadata();
+
+  if (getCodeGenOpts().EmitAbom)
+    EmitAbom();
 
   if (!getCodeGenOpts().StackProtectorGuard.empty())
     getModule().setStackProtectorGuard(getCodeGenOpts().StackProtectorGuard);
@@ -7290,6 +7294,26 @@ void CodeGenModule::EmitCommandLineMetadata() {
 
   llvm::Metadata *CommandLineNode[] = {llvm::MDString::get(Ctx, CommandLine)};
   CommandLineMetadata->addOperand(llvm::MDNode::get(Ctx, CommandLineNode));
+}
+
+std::string CodeGenModule::ComputeAbom(std::vector<std::string> &Deps) {
+  auto abom = llvm::ABOM::ABOM();
+  for (size_t i = 0; i < Deps.size(); i++) {
+    abom.insertFile(Deps[i]);
+  }
+  std::vector<uint8_t> abomBytes = abom.serialize();
+  return std::string(abomBytes.begin(), abomBytes.end());
+}
+
+void CodeGenModule::EmitAbom() {
+  llvm::NamedMDNode *AbomSection =
+    TheModule.getOrInsertNamedMetadata(".abom");
+  
+  std::string abom = ComputeAbom(*(getCodeGenOpts().AbomDependencies));
+
+  llvm::LLVMContext &Ctx = TheModule.getContext();
+  llvm::Metadata *AbomNode[] = {llvm::MDString::get(Ctx, abom)};
+  AbomSection->addOperand(llvm::MDNode::get(Ctx, AbomNode));
 }
 
 void CodeGenModule::EmitCoverageFile() {

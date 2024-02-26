@@ -15,6 +15,7 @@
 #include "clang/Basic/SourceManager.h"
 #include "clang/Frontend/DependencyOutputOptions.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
+#include "clang/Frontend/Utils.h"
 #include "clang/Lex/DirectoryLookup.h"
 #include "clang/Lex/ModuleMap.h"
 #include "clang/Lex/PPCallbacks.h"
@@ -188,6 +189,47 @@ void DependencyCollector::attachToPreprocessor(Preprocessor &PP) {
 void DependencyCollector::attachToASTReader(ASTReader &R) {
   R.addListener(
       std::make_unique<DepCollectorASTListener>(*this, R.getFileManager()));
+}
+
+AbomDependencyGenerator::AbomDependencyGenerator(
+    const DependencyOutputOptions &Opts)
+    : AddMissingHeaderDeps(Opts.AddMissingHeaderDeps),
+      IncludeModuleFiles(Opts.IncludeModuleFiles) {
+  setDependenciesPtr(Opts.AbomDependencies);
+}
+
+void AbomDependencyGenerator::attachToPreprocessor(Preprocessor &PP) {
+  // Disable the "file not found" diagnostic if the -MG option was given.
+  if (AddMissingHeaderDeps)
+    PP.SetSuppressIncludeNotFoundError(true);
+
+  DependencyCollector::attachToPreprocessor(PP);
+}
+
+bool AbomDependencyGenerator::sawDependency(StringRef Filename, bool FromModule,
+                                           bool IsSystem, bool IsModuleFile,
+                                           bool IsMissing) {
+  if (IsMissing) {
+    // If a file that is in the include directive is missing, then its hash
+    // cannot be computed. So do not consider this as an ABOM dependency.
+    return false;
+  }
+  if (IsModuleFile && !IncludeModuleFiles)
+    return false;
+
+  if (isSpecialFilename(Filename))
+    return false;
+
+  // System headers are to be included when computing ABOM dependencies.
+  return true;
+}
+
+bool AbomDependencyGenerator::addDependency(StringRef Filename) {
+  bool added = DependencyCollector::addDependency(Filename);
+  if (added) {
+    AbomDependencies->push_back(std::string(Filename));
+  }
+  return added;
 }
 
 DependencyFileGenerator::DependencyFileGenerator(

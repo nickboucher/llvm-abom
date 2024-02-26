@@ -374,6 +374,11 @@ template <class ELFT> void elf::createSyntheticSections() {
       add(*in.mipsReginfo);
   }
 
+  if (config->abom) {
+    if ((in.abom = AbomSection<ELFT>::create()))
+      add(*in.abom);
+  }
+
   StringRef relaDynName = config->isRela ? ".rela.dyn" : ".rel.dyn";
 
   const unsigned threadCount = config->threadCount;

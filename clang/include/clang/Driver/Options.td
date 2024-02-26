@@ -1867,6 +1867,8 @@ This option is currently only supported on ELF targets.}]>,
   Group<f_clang_Group>;
 def fno_record_command_line : Flag<["-"], "fno-record-command-line">,
   Group<f_clang_Group>;
+def fabom : Flag<["-"], "fabom">, Group<f_clang_Group>, HelpText<"Emit Automatic Bill of Materials in output.">;
+def fno_abom : Flag<["-"], "fno-abom">, Group<f_clang_Group>;
 def : Flag<["-"], "frecord-gcc-switches">, Alias<frecord_command_line>;
 def : Flag<["-"], "fno-record-gcc-switches">, Alias<fno_record_command_line>;
 def fcommon : Flag<["-"], "fcommon">, Group<f_Group>,
@@ -6762,6 +6764,9 @@ def dwarf_debug_flags : Separate<["-"], "dwarf-debug-flags">,
 def record_command_line : Separate<["-"], "record-command-line">,
   HelpText<"The string to embed in the .LLVM.command.line section.">,
   MarshallingInfoString<CodeGenOpts<"RecordCommandLine">>;
+def abom: Flag<["-"], "emit-abom">,
+  HelpText<"Emit an Automatic Bill of Materials in the output.">,
+  MarshallingInfoFlag<CodeGenOpts<"EmitAbom">>;
 def compress_debug_sections_EQ : Joined<["-", "--"], "compress-debug-sections=">,
     HelpText<"DWARF debug sections compression type">, Values<"none,zlib,zstd">,
     NormalizedValuesScope<"llvm::DebugCompressionType">, NormalizedValues<["None", "Zlib", "Zstd"]>,

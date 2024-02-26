@@ -250,6 +250,10 @@ defm gdb_index: BB<"gdb-index",
     "Generate .gdb_index section",
     "Do not generate .gdb_index section (default)">;
 
+defm abom: BB<"abom",
+  "Enable generation of .abom section",
+  "Disable generation of .abom section">;
+
 defm gnu_unique: BB<"gnu-unique",
   "Enable STB_GNU_UNIQUE symbol binding (default)",
   "Disable STB_GNU_UNIQUE symbol binding">;

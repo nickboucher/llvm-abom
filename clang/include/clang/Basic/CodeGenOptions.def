@@ -35,6 +35,7 @@ CODEGENOPT(Name, Bits, Default)
 VALUE_CODEGENOPT(Name, Bits, Default)
 #endif
 
+CODEGENOPT(EmitAbom           , 1, 0) ///< -emit-abom
 CODEGENOPT(DisableIntegratedAS, 1, 0) ///< -no-integrated-as
 CODEGENOPT(RelaxELFRelocations, 1, 1) ///< -Wa,-mrelax-relocations={yes,no}
 CODEGENOPT(AsmVerbose        , 1, 0) ///< -dA, -fverbose-asm.

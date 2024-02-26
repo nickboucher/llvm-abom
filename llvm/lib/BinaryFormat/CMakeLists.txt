@@ -1,5 +1,10 @@
+set(OPENSSL_USE_STATIC_LIBS TRUE)
+find_package(OpenSSL REQUIRED)
+
 add_llvm_component_library(LLVMBinaryFormat
+  ABOM.cpp
   AMDGPUMetadataVerifier.cpp
+  ArithmeticCoding.cpp
   COFF.cpp
   Dwarf.cpp
   DXContainer.cpp
@@ -20,4 +25,7 @@ add_llvm_component_library(LLVMBinaryFormat
   LINK_COMPONENTS
   Support
   TargetParser
+
+  LINK_LIBS
+  ${OPENSSL_CRYPTO_LIBRARY}
   )

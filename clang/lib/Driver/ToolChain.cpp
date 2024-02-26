@@ -1264,6 +1264,15 @@ void ToolChain::AddFilePathLibArgs(const ArgList &Args,
       CmdArgs.push_back(Args.MakeArgString(StringRef("-L") + LibPath));
 }
 
+void ToolChain::AddAbomFlag(const ArgList &Args,
+                            ArgStringList &CmdArgs) const {
+  bool AbomSwitches = Args.hasFlag(
+      options::OPT_fabom, options::OPT_fno_abom, false);
+  if (AbomSwitches) {
+    CmdArgs.push_back("--abom");
+  }
+}
+
 void ToolChain::AddCCKextLibArgs(const ArgList &Args,
                                  ArgStringList &CmdArgs) const {
   CmdArgs.push_back("-lcc_kext");

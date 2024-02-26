@@ -10,6 +10,7 @@
 #define LLVM_CLANG_FRONTEND_DEPENDENCYOUTPUTOPTIONS_H
 
 #include "clang/Basic/HeaderInclude.h"
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -79,6 +80,9 @@ public:
   /// A list of extra dependencies (filename and kind) to be used for every
   /// target.
   std::vector<std::pair<std::string, ExtraDepKind>> ExtraDeps;
+
+  /// List of dependencies; this is shared with CodeGenOptions.
+  std::shared_ptr<std::vector<std::string>> AbomDependencies;
 
   /// The file to write GraphViz-formatted header dependencies to.
   std::string DOTOutputFile;
