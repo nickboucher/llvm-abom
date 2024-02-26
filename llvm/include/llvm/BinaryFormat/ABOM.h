@@ -152,6 +152,13 @@ namespace SHAKE128 {
     /// @param out The output buffer
     /// @return True if the hash was successful, false otherwise
     bool hashFile(std::string filename, uint8_t *out, uint8_t bits = ABOM_BITS);
+
+    /// @brief Convert a hexadecimal string to a hash
+    /// @param hex The hexadecimal string to convert
+    /// @param out The output buffer
+    /// @param bits The number of bits in the hash
+    /// @return True if the conversion was successful, false otherwise
+    bool fromHex(std::string const &hex, hash_t &out, uint8_t bits = ABOM_BITS);
 }
 }
 }

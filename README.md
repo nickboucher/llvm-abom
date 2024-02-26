@@ -38,6 +38,17 @@ This will output the hash as a hex string, e.g.:
 d43f65e61
 ```
 
+## Check Binary for an ABOM Hash
+
+To query a binary for an ABOM hash, use the `llvm-abom-check` tool:
+```sh
+llvm-abom-check hello d43f65e61
+```
+This will output whether the binary contains the specified ABOM hash:
+```
+Present: hello contains d43f65e61
+```
+
 ## Examining an ABOM
 
 To examine an ABOM contained within a binary, leverage the `llvm-readobj` tool:

@@ -2,6 +2,7 @@
 #include "llvm/BinaryFormat/ArithmeticCoding.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/WithColor.h"
 #include <bitset>
 #include <string>
 #include <iomanip>
@@ -96,11 +97,11 @@ const ABOM ABOM::operator|(const ABOM &rhs) {
 // Anonymous namespace to prevent external access
 namespace {
 inline ABOM deserializeError(std::string const &error, std::string const &filename) {
-    llvm::errs() << error;
-    if (!filename.empty()) {
-        llvm::errs() << "in: " << filename;
+    if (filename.empty()) {
+        llvm::WithColor::error(llvm::errs()) << error << "\n";
+    } else {
+        llvm::WithColor::error(llvm::errs(), filename) << error << "\n";
     }
-    llvm::errs() << "\n";
     return ABOM();
 }
 }
@@ -250,7 +251,7 @@ bool finalizeHash(EVP_MD **md, EVP_MD_CTX **ctx, hash_t out, uint8_t bits) {
 }
 
 bool hashError(std::string target) {
-    llvm::errs() << "Error calculating SHAKE128 hash: " << target << "\n";
+    llvm::WithColor::error(llvm::errs()) << "Error calculating SHAKE128 hash: " << target << "\n";
     return false;
 }
 }
@@ -279,5 +280,39 @@ bool SHAKE128::hashFile(std::string filename, hash_t out, uint8_t bits) {
     } while (!file.eof());
 
     if (!finalizeHash(&md, &ctx, out, bits)) return hashError(filename);
+    return true;
+}
+
+bool SHAKE128::fromHex(std::string const &hex, hash_t &out, uint8_t bits) {
+    // Local variables
+    std::string s;
+    std::string h = hex;
+    size_t i;
+    // Remove any leading "0x" or "0X"
+    if (h.length() > 2 && h[0] == '0' && (h[1] == 'x' || h[1] == 'X')) {
+        h = h.substr(2);
+    }
+    // Check for valid hexadecimal characters
+    for (i = 0; i < h.length(); i++) {
+        if (!isxdigit(h[i])) {
+            llvm::WithColor::error(llvm::errs()) << "Invalid hexadecimal character: " << h[i] << "\n";
+            return false;
+        }
+    }
+    // Check that the length is correct
+    if (h.length() != bits / 4) {
+        llvm::WithColor::error(llvm::errs()) << "Invalid hash length: " << h.length() << "\n";
+        return false;
+    }
+    // Pad with trailing zero if necessary
+    if (h.length() % 2) {
+        h += "0";
+    }
+    // Convert to binary
+    for (i = 0; i < h.length(); i += 2) {
+        s = h.substr(i, 2);
+        out[i/2] = (uint8_t)strtol(s.c_str(), NULL, 16);
+    }
+    // Conversion successful
     return true;
 }
