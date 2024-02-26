@@ -25,6 +25,19 @@ If `lld` is not the default linker on your system, you can specify it using the 
 clang -fabom -fuse-ld=lld -o hello hello.c
 ```
 
+## Calculating an ABOM Hash
+
+ABOM hashes are simply SHAKE128(36) hashes of source code files.
+
+For conveinence, ABOM hashes can be generated using the `llvm-abom-hash` tool:
+```sh
+llvm-abom-hash hello.c
+```
+This will output the hash as a hex string, e.g.:
+```
+d43f65e61
+```
+
 ## Examining an ABOM
 
 To examine an ABOM contained within a binary, leverage the `llvm-readobj` tool:
