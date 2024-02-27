@@ -72,11 +72,11 @@ std::vector<uint8_t> ABOM::serialize() {
 }
 
 void ABOM::operator|=(const ABOM &rhs) {
-    for (size_t i=0; i<bfs.size(); i++) {
+    for (size_t i=0; i<rhs.bfs.size(); i++) {
         bool inserted = false;
-        for (size_t j=0; j<rhs.bfs.size(); j++) {
+        for (size_t j=0; j<bfs.size(); j++) {
             CBloomFilter bf = bfs[i] | rhs.bfs[j];
-            if (bf.falsePositiveRate() < ABOM_F) {
+            if (bf.falsePositiveRate() <= ABOM_F) {
                 bfs[j] = bf;
                 inserted = true;
                 break;
