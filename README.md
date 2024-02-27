@@ -53,7 +53,7 @@ Present: hello contains d43f65e61
 
 To examine an ABOM contained within a binary, leverage the `llvm-readobj` tool:
 ```sh
-llvm-readobj -abom hello
+llvm-readobj --abom hello
 ```
 This will output information about the ABOM header:
 ```
