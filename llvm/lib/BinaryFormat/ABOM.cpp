@@ -83,7 +83,7 @@ void ABOM::operator|=(const ABOM &rhs) {
             }
         }
         if (!inserted) {
-            bfs.push_back(rhs.bfs[i]);
+            bfs.push_back(CBloomFilter(*rhs.bfs[i].bf));
         }
     }
 }
