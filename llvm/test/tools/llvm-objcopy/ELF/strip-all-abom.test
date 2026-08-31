@@ -1,0 +1,29 @@
+## The Automatic Bill of Materials survives stripping, so that a shipped binary
+## still describes the source files it was compiled from.
+
+# RUN: yaml2obj %s -o %t
+# RUN: llvm-strip --strip-all %t
+# RUN: llvm-readobj --sections %t | FileCheck %s
+
+# CHECK: Name: .abom
+
+## --strip-non-alloc asks for it to be removed.
+# RUN: yaml2obj %s -o %t2
+# RUN: llvm-objcopy --strip-non-alloc %t2
+# RUN: llvm-readobj --sections %t2 | FileCheck %s --check-prefix=NONALLOC
+
+# NONALLOC-NOT: Name: .abom
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_REL
+  Machine: EM_X86_64
+Sections:
+  - Name:    .text
+    Type:    SHT_PROGBITS
+    Flags:   [ SHF_ALLOC, SHF_EXECINSTR ]
+  - Name:    .abom
+    Type:    SHT_PROGBITS
+    Content: '41424f4d010100ff7f00000005000000903d4533e8'

@@ -13,6 +13,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/ObjCopy/CommonConfig.h"
@@ -483,6 +484,11 @@ static Error replaceAndRemoveSections(const CommonConfig &Config,
       // patchset as documented here:
       // https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=943798
       if (Sec.Type == SHT_ARM_ATTRIBUTES)
+        return false;
+      // The Automatic Bill of Materials describes the source files the binary
+      // was compiled from, and is meant to reach whoever runs the binary. GNU
+      // strip keeps it as well.
+      if (Sec.Name == abom::SectionName)
         return false;
       if (Sec.ParentSegment != nullptr)
         return false;
