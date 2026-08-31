@@ -11,6 +11,8 @@ llc
 lldb-tblgen
 lli
 llubi
+llvm-abom-check
+llvm-abom-hash
 llvm-addr2line
 llvm-ar
 llvm-as
@@ -79,6 +81,8 @@ interested in.
 * {doc}`llc`
 * {doc}`lli`
 * {doc}`llubi`
+* {doc}`llvm-abom-check`
+* {doc}`llvm-abom-hash`
 * {doc}`llvm-as`
 * {doc}`llvm-cgdata`
 * {doc}`llvm-config`

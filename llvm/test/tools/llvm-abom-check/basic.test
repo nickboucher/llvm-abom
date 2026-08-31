@@ -1,0 +1,49 @@
+## Queries against a record extracted from a binary, an object file, and an
+## archive.
+
+# RUN: rm -rf %t && split-file %s %t
+# RUN: llvm-mc -filetype=obj -triple=x86_64 %t/a.s -o %t/a.o
+# RUN: llvm-mc -filetype=obj -triple=x86_64 %t/empty.s -o %t/empty.o
+# RUN: llvm-ar rc %t/a.a %t/a.o
+
+# RUN: llvm-abom-check %t/a.o 5881092dd | FileCheck %s
+# RUN: llvm-abom-check %t/a.a 5881092dd | FileCheck %s
+# CHECK: 5881092dd is present
+
+# RUN: not llvm-abom-check %t/a.o fffffffff | FileCheck %s --check-prefix=ABSENT
+# ABSENT: fffffffff is absent
+
+## A record extracted from a binary can be queried on its own.
+# RUN: llvm-objcopy --dump-section=.abom=%t/a.abom %t/a.o /dev/null
+# RUN: llvm-abom-check %t/a.abom 5881092dd | FileCheck %s
+
+## The summary reports what the bill of materials is made of.
+# RUN: llvm-abom-check --summary %t/a.o | FileCheck %s --check-prefix=SUMMARY
+# SUMMARY: 1 Bloom filter
+
+## Hashes may be read from a file, in the form llvm-abom-hash writes them,
+## with comments and trailing fields ignored.
+# RUN: llvm-abom-hash %t/a.s > %t/hashes
+# RUN: echo "# a comment" >> %t/hashes
+# RUN: echo "5881092dd  some/source/file.c" >> %t/hashes
+# RUN: not llvm-abom-check --hashes %t/hashes %t/a.o | FileCheck %s \
+# RUN:   --check-prefix=FROMFILE
+# FROMFILE:      is absent
+# FROMFILE-NEXT: 5881092dd is present
+
+## Diagnostics.
+# RUN: not llvm-abom-check %t/a.o 0123 2>&1 | FileCheck %s --check-prefix=BADHASH
+# BADHASH: error: '0123' is not an ABOM hash
+
+# RUN: not llvm-abom-check %t/empty.o 5881092dd 2>&1 | FileCheck %s --check-prefix=NONE
+# NONE: warning: {{.*}}empty.o: no bill of materials found
+
+#--- empty.s
+.text
+nop
+
+#--- a.s
+.section .abom,"",@progbits
+## An ABOM holding 5881092dd.
+.byte 0x41, 0x42, 0x4f, 0x4d, 0x01, 0x01, 0x00, 0xff, 0x7f, 0x00, 0x00, 0x05
+.byte 0x00, 0x00, 0x00, 0x90, 0x3d, 0x45, 0x33, 0xe8

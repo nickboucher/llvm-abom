@@ -1,0 +1,11 @@
+## The hash of a source file is the leading bits of its SHAKE128 digest.
+
+# RUN: echo -n "abc" > %t.c
+# RUN: llvm-abom-hash %t.c | FileCheck %s --check-prefix=HASH
+# HASH: 5881092dd {{.*}}.c
+
+# RUN: echo -n "abc" | llvm-abom-hash | FileCheck %s --check-prefix=STDIN
+# STDIN: 5881092dd  <stdin>
+
+# RUN: not llvm-abom-hash %t.does-not-exist 2>&1 | FileCheck %s --check-prefix=ERR
+# ERR: error: {{.*}}.does-not-exist:

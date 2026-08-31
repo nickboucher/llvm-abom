@@ -1,0 +1,25 @@
+## Every slice of a universal binary is queried.
+
+# RUN: rm -rf %t && split-file %s %t
+# RUN: llvm-mc -filetype=obj -triple=x86_64-apple-darwin %t/x86.s -o %t/x86.o
+# RUN: llvm-mc -filetype=obj -triple=arm64-apple-darwin %t/arm64.s -o %t/arm64.o
+# RUN: llvm-lipo %t/x86.o %t/arm64.o -create -o %t/fat.o
+
+# RUN: llvm-abom-check %t/fat.o 5881092dd 123456789 | FileCheck %s
+# CHECK:      5881092dd is present
+# CHECK-NEXT: 123456789 is present
+
+# RUN: not llvm-abom-check %t/fat.o fffffffff | FileCheck %s --check-prefix=ABSENT
+# ABSENT: fffffffff is absent
+
+#--- x86.s
+.section __ABOM,__abom
+## An ABOM holding 5881092dd.
+.byte 0x41, 0x42, 0x4f, 0x4d, 0x01, 0x01, 0x00, 0xff, 0x7f, 0x00, 0x00, 0x05
+.byte 0x00, 0x00, 0x00, 0x90, 0x3d, 0x45, 0x33, 0xe8
+
+#--- arm64.s
+.section __ABOM,__abom
+## An ABOM holding 123456789.
+.byte 0x41, 0x42, 0x4f, 0x4d, 0x01, 0x01, 0x00, 0xff, 0x7f, 0x00, 0x00, 0x05
+.byte 0x00, 0x00, 0x00, 0xc0, 0x9e, 0xeb, 0x5a, 0x2e

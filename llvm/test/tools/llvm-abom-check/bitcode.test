@@ -1,0 +1,37 @@
+## A module compiled for link time optimization is not an object file and has
+## no sections, so its hashes are read from the metadata that carries them
+## until the backend inside the linker emits a record.
+
+# RUN: rm -rf %t && split-file %s %t
+# RUN: llvm-as %t/a.ll -o %t/a.bc
+# RUN: llvm-as %t/b.ll -o %t/b.bc
+# RUN: llvm-ar rc %t/lib.a %t/a.bc %t/b.bc
+
+# RUN: llvm-abom-check %t/a.bc 5881092dd | FileCheck %s
+# CHECK: 5881092dd is present
+
+# RUN: not llvm-abom-check %t/a.bc 123456789 | FileCheck %s --check-prefix=ABSENT
+# ABSENT: 123456789 is absent
+
+## An archive of them is read the same way.
+# RUN: llvm-abom-check %t/lib.a 5881092dd 123456789 | FileCheck %s --check-prefix=BOTH
+# BOTH:      5881092dd is present
+# BOTH-NEXT: 123456789 is present
+
+## A module without the metadata records nothing.
+# RUN: llvm-as %t/none.ll -o %t/none.bc
+# RUN: not llvm-abom-check %t/none.bc 5881092dd 2>&1 | FileCheck %s --check-prefix=NONE
+# NONE: warning: {{.*}}none.bc: no bill of materials found
+
+#--- a.ll
+!llvm.abom = !{!0}
+!0 = !{!"ABOM\01\01\00\FF\7F\00\00\05\00\00\00\90=E3\E8"}
+
+#--- b.ll
+!llvm.abom = !{!0}
+!0 = !{!"ABOM\01\01\00\FF\7F\00\00\05\00\00\00\C0\9E\EBZ."}
+
+#--- none.ll
+define void @f() {
+  ret void
+}

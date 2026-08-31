@@ -19,6 +19,7 @@ LangRef
 UndefinedBehavior
 InAlloca
 BitCodeFormat
+ABOM
 MIRLangRef
 GlobalISel/index
 ConvergentOperations
@@ -125,6 +126,10 @@ XRayFDRFormat
 
 {doc}`BitCodeFormat`
 :   This describes the file format and encoding used for LLVM "bc" files.
+
+{doc}`Automatic Bill of Materials <ABOM>`
+:   This describes the record of source files that the toolchain embeds in the
+    binaries it emits, and the tools that query it.
 
 {doc}`Machine IR (MIR) Format Reference Manual <MIRLangRef>`
 :   A reference manual for the MIR serialization format, which is used to test
