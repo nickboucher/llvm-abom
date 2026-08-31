@@ -12,6 +12,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/IR/AutoUpgrade.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfoMetadata.h"
@@ -1144,7 +1145,8 @@ void IRLinker::linkNamedMDNodes() {
     }
     // The stats are computed per module and will all be merged in the binary.
     // Importing the metadata will cause duplication of the stats.
-    if (IsPerformingImport && NMD.getName() == "llvm.stats")
+    if (IsPerformingImport && (NMD.getName() == "llvm.stats" ||
+                               NMD.getName() == llvm::abom::MetadataName))
       continue;
 
     NamedMDNode *DestNMD = DstM.getOrInsertNamedMetadata(NMD.getName());

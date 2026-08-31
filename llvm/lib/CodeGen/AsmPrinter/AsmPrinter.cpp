@@ -33,6 +33,7 @@
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/COFF.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/BinaryFormat/ELF.h"
@@ -3119,6 +3120,9 @@ bool AsmPrinter::doFinalization(Module &M) {
   if (!Target.isOSBinFormatXCOFF())
     emitModuleCommandLines(M);
 
+  // Emit the Automatic Bill of Materials of the module's source files.
+  emitModuleAbom(M);
+
   // Emit .note.GNU-split-stack and .note.GNU-no-split-stack sections if
   // split-stack is used.
   if (TM.getTargetTriple().isOSBinFormatELF() && HasSplitStack) {
@@ -3762,6 +3766,47 @@ void AsmPrinter::emitModuleIdents(Module &M) {
       OutStreamer->emitIdent(S->getString());
     }
   }
+}
+
+void AsmPrinter::emitModuleAbom(Module &M) {
+  const NamedMDNode *NMD = M.getNamedMetadata(abom::MetadataName);
+  if (!NMD || !NMD->getNumOperands())
+    return;
+
+  MCSection *AbomSection = OutContext.getObjectFileInfo()->getAbomSection();
+  if (!AbomSection)
+    return;
+
+  // Each operand holds the bill of materials of one module. There is more than
+  // one when modules have been linked together, in which case they are merged
+  // so that the object file holds a single record.
+  auto getRecord = [](const MDNode *N) {
+    assert(N->getNumOperands() == 1 &&
+           "abom metadata entry can have only one operand");
+    return cast<MDString>(N->getOperand(0))->getString();
+  };
+
+  StringRef Record = getRecord(NMD->getOperand(0));
+  SmallVector<uint8_t> Merged;
+  if (NMD->getNumOperands() > 1) {
+    SmallVector<ArrayRef<uint8_t>, 0> Records;
+    for (const MDNode *N : NMD->operands())
+      Records.push_back(arrayRefFromStringRef(getRecord(N)));
+
+    abom::BillOfMaterials BOM;
+    if (Error E = BOM.mergeAll(Records, [](size_t I) {
+          return (abom::MetadataName + " operand " + Twine(I)).str();
+        }))
+      report_fatal_error(std::move(E));
+    if (Error E = BOM.writeFilters(Merged))
+      report_fatal_error(std::move(E));
+    Record = toStringRef(Merged);
+  }
+
+  OutStreamer->pushSection();
+  OutStreamer->switchSection(AbomSection);
+  OutStreamer->emitBytes(Record);
+  OutStreamer->popSection();
 }
 
 void AsmPrinter::emitModuleCommandLines(Module &M) {

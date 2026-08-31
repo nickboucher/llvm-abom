@@ -1006,6 +1006,8 @@ private:
   void emitModuleIdents(Module &M);
   /// Emit bytes for llvm.commandline metadata.
   virtual void emitModuleCommandLines(Module &M);
+  /// Emit the Automatic Bill of Materials of the module's source files.
+  void emitModuleAbom(Module &M);
 
   GCMetadataPrinter *getOrCreateGCPrinter(GCStrategy &S);
   virtual void emitGlobalIFunc(Module &M, const GlobalIFunc &GI);

@@ -367,6 +367,10 @@ public:
 
   MCSection *getStackSizesSection(const MCSection &TextSec) const;
 
+  /// Returns the section that carries the Automatic Bill of Materials, or
+  /// nullptr if the object file format has none.
+  MCSection *getAbomSection() const;
+
   MCSection *getBBAddrMapSection(const MCSection &TextSec) const;
 
   MCSection *getKCFITrapSection(const MCSection &TextSec) const;

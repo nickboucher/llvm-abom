@@ -60,6 +60,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/AttributeMask.h"
@@ -308,6 +309,7 @@ public:
     visitModuleFlags();
     visitModuleIdents();
     visitModuleCommandLines();
+    visitModuleAbom();
     visitModuleErrnoTBAA();
 
     verifyCompileUnits();
@@ -345,6 +347,7 @@ private:
   void visitComdat(const Comdat &C);
   void visitModuleIdents();
   void visitModuleCommandLines();
+  void visitModuleAbom();
   void visitModuleErrnoTBAA();
   void visitModuleFlags();
   void visitModuleFlag(const MDNode *Op,
@@ -1824,6 +1827,31 @@ void Verifier::visitModuleCommandLines() {
           ("invalid value for llvm.commandline metadata entry operand"
            "(the operand should be a string)"),
           N->getOperand(0));
+  }
+}
+
+void Verifier::visitModuleAbom() {
+  const NamedMDNode *Abom = M.getNamedMetadata(abom::MetadataName);
+  if (!Abom)
+    return;
+
+  // Each llvm.abom entry holds a single string, which is a bill of materials.
+  // Its header is checked here; decoding the payload is left to whoever reads
+  // it.
+  Twine Name = Twine(abom::MetadataName);
+  for (const MDNode *N : Abom->operands()) {
+    Check(N->getNumOperands() == 1,
+          "incorrect number of operands in " + Name + " metadata", N);
+    const auto *S = dyn_cast_or_null<MDString>(N->getOperand(0));
+    Check(S,
+          "invalid value for " + Name +
+              " metadata entry operand(the operand should be a string)",
+          N->getOperand(0));
+    if (Error E =
+            abom::readHeader(arrayRefFromStringRef(S->getString())).takeError())
+      CheckFailed(Name + " metadata entry is not a bill of materials: " +
+                      toString(std::move(E)),
+                  N);
   }
 }
 

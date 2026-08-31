@@ -8,6 +8,7 @@
 
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/COFF.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/BinaryFormat/GOFF.h"
@@ -1407,6 +1408,34 @@ MCObjectFileInfo::getPseudoProbeDescSection(StringRef FuncName,
   }
 
   return PseudoProbeDescSection;
+}
+
+MCSection *MCObjectFileInfo::getAbomSection() const {
+  switch (Ctx->getObjectFileType()) {
+  case MCContext::IsELF:
+    // The bill of materials is metadata, so keep it out of the load image.
+    return Ctx->getELFSection(abom::SectionName, ELF::SHT_PROGBITS,
+                              /*Flags=*/0);
+  case MCContext::IsCOFF:
+    // Likewise, mark it discardable so that it is not loaded.
+    return Ctx->getCOFFSection(abom::SectionName,
+                               COFF::IMAGE_SCN_CNT_INITIALIZED_DATA |
+                                   COFF::IMAGE_SCN_MEM_DISCARDABLE |
+                                   COFF::IMAGE_SCN_MEM_READ);
+  case MCContext::IsMachO:
+    return Ctx->getMachOSection(abom::MachOSegmentName, abom::MachOSectionName,
+                                0, SectionKind::getReadOnly());
+  case MCContext::IsWasm:
+    return Ctx->getWasmSection(
+        (".custom_section." + abom::WasmSectionName).str(),
+        SectionKind::getMetadata());
+  case MCContext::IsGOFF:
+  case MCContext::IsSPIRV:
+  case MCContext::IsXCOFF:
+  case MCContext::IsDXContainer:
+    return nullptr;
+  }
+  llvm_unreachable("Unknown object file format");
 }
 
 MCSection *MCObjectFileInfo::getLLVMStatsSection() const {
