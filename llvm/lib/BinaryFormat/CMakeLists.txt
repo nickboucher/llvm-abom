@@ -1,4 +1,5 @@
 add_llvm_component_library(LLVMBinaryFormat
+  ABOM.cpp
   AMDGPUMetadataVerifier.cpp
   COFF.cpp
   Dwarf.cpp
