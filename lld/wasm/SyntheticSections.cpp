@@ -956,6 +956,28 @@ void ProducersSection::writeBody() {
   }
 }
 
+void AbomSection::addRecords(ArrayRef<uint8_t> section, StringRef fileName) {
+  records.push_back(section);
+  fileNames.push_back(fileName.str());
+}
+
+void AbomSection::writeBody() {
+  // Merging on past a malformed record would emit a bill of materials that
+  // looks sound but has silently forgotten source files.
+  abom::BillOfMaterials bom;
+  if (Error e = bom.mergeAll(records, [&](size_t i) { return fileNames[i]; })) {
+    error(toString(std::move(e)));
+    return;
+  }
+
+  SmallVector<uint8_t> record;
+  if (Error e = bom.writeFilters(record)) {
+    error(toString(std::move(e)));
+    return;
+  }
+  bodyOutputStream << toStringRef(record);
+}
+
 void TargetFeaturesSection::writeBody() {
   SmallVector<std::string, 8> emitted(features.begin(), features.end());
   llvm::sort(emitted);

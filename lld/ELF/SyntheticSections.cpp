@@ -4332,6 +4332,39 @@ size_t MemtagAndroidNote::getSize() const {
          /*descsz=*/sizeof(uint32_t);
 }
 
+// Collects the ABOM records of the input files, merges them, and returns the
+// section holding the merged result. The inputs are dropped, so that the image
+// carries exactly one bill of materials.
+std::unique_ptr<AbomSection> AbomSection::create(Ctx &ctx) {
+  SmallVector<InputSectionBase *, 0> sections;
+  SmallVector<ArrayRef<uint8_t>, 0> records;
+  for (InputSectionBase *sec : ctx.inputSections) {
+    if (!sec->isLive() || sec->name != llvm::abom::SectionName)
+      continue;
+    sec->markDead();
+    sections.push_back(sec);
+    records.push_back(sec->content());
+  }
+  if (sections.empty())
+    return nullptr;
+
+  // Merging on past a malformed record would emit a bill of materials that
+  // looks sound but has silently forgotten source files.
+  llvm::abom::BillOfMaterials bom;
+  if (Error e = bom.mergeAll(
+          records, [&](size_t i) { return toStr(ctx, sections[i]); })) {
+    Err(ctx) << std::move(e);
+    return nullptr;
+  }
+
+  SmallVector<uint8_t> record;
+  if (Error e = bom.writeFilters(record)) {
+    Err(ctx) << std::move(e);
+    return nullptr;
+  }
+  return std::make_unique<AbomSection>(ctx, std::move(record));
+}
+
 void PackageMetadataNote::writeTo(uint8_t *buf) {
   write32(ctx, buf, 4);
   write32(ctx, buf + 4, ctx.arg.packageMetadata.size() + 1);
@@ -4465,6 +4498,10 @@ template <class ELFT> void elf::createSyntheticSections(Ctx &ctx) {
   add(*ctx.in.bssRelRo);
 
   ctx.target->initTargetSpecificSections();
+
+  // Merge the bills of materials of the input files.
+  if ((ctx.in.abom = AbomSection::create(ctx)))
+    add(*ctx.in.abom);
 
   StringRef relaDynName = ctx.arg.isRela ? ".rela.dyn" : ".rel.dyn";
 

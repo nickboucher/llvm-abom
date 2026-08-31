@@ -638,6 +638,7 @@ struct InStruct {
   std::unique_ptr<SyntheticSection> mipsRldMap;
   std::unique_ptr<SyntheticSection> ppc32Got2;
   // Non-SHF_ALLOC sections
+  std::unique_ptr<SyntheticSection> abom;
   std::unique_ptr<SyntheticSection> debugNames;
   std::unique_ptr<GdbIndexSection> gdbIndex;
   std::unique_ptr<StringTableSection> shStrTab;

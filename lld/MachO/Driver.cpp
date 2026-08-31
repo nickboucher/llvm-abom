@@ -34,6 +34,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/BinaryFormat/Magic.h"
 #include "llvm/CGData/CodeGenDataWriter.h"
@@ -1517,8 +1518,41 @@ static void createFiles(const InputArgList &args) {
 #endif
 }
 
+// Merges the bills of materials of the input files into a single record, so
+// that the image describes the source files of its entire dependency tree.
+static void addAbomSection(ArrayRef<const Section *> sections) {
+  SmallVector<ArrayRef<uint8_t>, 0> records;
+  SmallVector<const Section *, 0> owners;
+  for (const Section *section : sections)
+    for (const Subsection &subsection : section->subsections) {
+      records.push_back(subsection.isec->data);
+      owners.push_back(section);
+    }
+
+  // Merging on past a malformed record would emit a bill of materials that
+  // looks sound but has silently forgotten source files.
+  abom::BillOfMaterials bom;
+  if (Error e = bom.mergeAll(
+          records, [&](size_t i) { return toString(owners[i]->file); })) {
+    error(toString(std::move(e)));
+    return;
+  }
+
+  SmallVector<uint8_t> record;
+  if (Error e = bom.writeFilters(record)) {
+    error(toString(std::move(e)));
+    return;
+  }
+  uint8_t *data = bAlloc().Allocate<uint8_t>(record.size());
+  memcpy(data, record.data(), record.size());
+  addInputSection(makeSyntheticInputSection(abom::MachOSegmentName,
+                                            abom::MachOSectionName, S_REGULAR,
+                                            ArrayRef(data, record.size())));
+}
+
 static void gatherInputSections() {
   TimeTraceScope timeScope("Gathering input sections");
+  SmallVector<const Section *, 0> abomSections;
   for (const InputFile *file : inputFiles) {
     for (const Section *section : file->sections) {
       // Compact unwind entries require special handling elsewhere. (In
@@ -1528,12 +1562,21 @@ static void gatherInputSections() {
       // Addrsig sections contain metadata only needed at link time.
       if (section->name == section_names::addrSig)
         continue;
+      // Bills of materials are merged into a single record rather than
+      // concatenated.
+      if (section->name == abom::MachOSectionName &&
+          section->segname == abom::MachOSegmentName) {
+        abomSections.push_back(section);
+        continue;
+      }
       for (const Subsection &subsection : section->subsections)
         addInputSection(subsection.isec);
     }
     if (!file->objCImageInfo.empty())
       in.objCImageInfo->addFile(file);
   }
+  if (!abomSections.empty())
+    addAbomSection(abomSections);
 }
 
 static void codegenDataGenerate() {

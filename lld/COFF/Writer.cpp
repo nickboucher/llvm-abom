@@ -23,6 +23,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/COFF.h"
 #include "llvm/MC/StringTableBuilder.h"
 #include "llvm/Support/Endian.h"
@@ -139,6 +140,22 @@ private:
   const std::vector<std::pair<COFF::DebugType, Chunk *>> &records;
   bool writeRepro;
   const COFFLinkerContext &ctx;
+};
+
+// The Automatic Bill of Materials of the image, which is the union of the
+// bills of materials of the input files.
+class AbomChunk : public NonSectionChunk {
+public:
+  explicit AbomChunk(SmallVector<uint8_t> record) : record(std::move(record)) {}
+
+  size_t getSize() const override { return record.size(); }
+
+  void writeTo(uint8_t *b) const override {
+    memcpy(b, record.data(), record.size());
+  }
+
+private:
+  SmallVector<uint8_t> record;
 };
 
 class CVDebugRecordChunk : public NonSectionChunk {
@@ -1065,6 +1082,35 @@ void Writer::calculateStubDependentSizes() {
   dataDirOffset64 = peHeaderOffset + sizeof(pe32plus_header);
 }
 
+// A grouped section name, .abom$foo, is mapped to the .abom output section, so
+// a chunk with one holds a bill of materials as well.
+static bool isAbomSectionName(StringRef name) {
+  if (!name.consume_front(abom::SectionName))
+    return false;
+  return name.empty() || name.starts_with("$");
+}
+
+// Merges the bills of materials of the given chunks into a single record, so
+// that the image describes the source files of its entire dependency tree.
+// Merging on past a malformed record would emit a bill of materials that looks
+// sound but has silently forgotten source files.
+static Expected<SmallVector<uint8_t>>
+mergeAboms(ArrayRef<SectionChunk *> chunks) {
+  SmallVector<ArrayRef<uint8_t>, 0> records;
+  for (SectionChunk *sc : chunks)
+    records.push_back(sc->getContents());
+
+  abom::BillOfMaterials bom;
+  if (Error e = bom.mergeAll(
+          records, [&](size_t i) { return toString(chunks[i]->file); }))
+    return std::move(e);
+
+  SmallVector<uint8_t> record;
+  if (Error e = bom.writeFilters(record))
+    return std::move(e);
+  return record;
+}
+
 // Create output section objects and add them to OutputSections.
 void Writer::createSections() {
   llvm::TimeTraceScope timeScope("Output sections");
@@ -1110,6 +1156,7 @@ void Writer::createSections() {
   dtorsSec = createSection(".dtors", data | r | w);
 
   // Then bin chunks by name and output characteristics.
+  SmallVector<SectionChunk *, 0> abomChunks;
   for (Chunk *c : ctx.driver.getChunks()) {
     auto *sc = dyn_cast<SectionChunk>(c);
     if (sc && !sc->live) {
@@ -1125,12 +1172,27 @@ void Writer::createSections() {
     if (shouldStripSectionSuffix(sc, name, ctx.config.mingw))
       name = name.split('$').first;
 
+    // The bills of materials of the inputs are merged into a single record
+    // rather than concatenated.
+    if (sc && isAbomSectionName(name)) {
+      abomChunks.push_back(sc);
+      continue;
+    }
+
     if (name.starts_with(".tls"))
       tlsAlignment = std::max(tlsAlignment, c->getAlignment());
 
     PartialSection *pSec = createPartialSection(name,
                                                 c->getOutputCharacteristics());
     pSec->chunks.push_back(c);
+  }
+
+  if (!abomChunks.empty()) {
+    if (Expected<SmallVector<uint8_t>> record = mergeAboms(abomChunks))
+      createSection(abom::SectionName, data | discardable | r)
+          ->addChunk(make<AbomChunk>(std::move(*record)));
+    else
+      Err(ctx) << record.takeError();
   }
 
   fixPartialSectionChars(".rsrc", data | r);

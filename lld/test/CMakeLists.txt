@@ -46,6 +46,7 @@ if (NOT LLD_BUILT_STANDALONE)
     count
     dsymutil
     llc
+    llvm-abom-check
     llvm-ar
     llvm-as
     llvm-bcanalyzer

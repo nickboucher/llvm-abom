@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/WasmTraits.h"
 #include <optional>
 
@@ -394,6 +395,22 @@ protected:
   SmallVector<std::pair<std::string, std::string>, 8> sDKs;
 };
 
+// The Automatic Bill of Materials of the image, which is the union of the
+// bills of materials of the input files.
+class AbomSection : public SyntheticSection {
+public:
+  AbomSection()
+      : SyntheticSection(llvm::wasm::WASM_SEC_CUSTOM,
+                         std::string(llvm::abom::WasmSectionName)) {}
+  bool isNeeded() const override { return !records.empty(); }
+  void writeBody() override;
+  void addRecords(llvm::ArrayRef<uint8_t> section, StringRef fileName);
+
+protected:
+  llvm::SmallVector<llvm::ArrayRef<uint8_t>, 0> records;
+  llvm::SmallVector<std::string, 0> fileNames;
+};
+
 class TargetFeaturesSection : public SyntheticSection {
 public:
   TargetFeaturesSection()
@@ -466,6 +483,7 @@ struct OutStruct {
   LinkingSection *linkingSec;
   NameSection *nameSec;
   ProducersSection *producersSec;
+  AbomSection *abomSec;
   TargetFeaturesSection *targetFeaturesSec;
   BuildIdSection *buildIdSec;
 };

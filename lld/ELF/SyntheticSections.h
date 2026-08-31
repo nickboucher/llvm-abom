@@ -28,6 +28,7 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLFunctionalExtras.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/DebugInfo/DWARF/DWARFAcceleratorTable.h"
 #include "llvm/MC/StringTableBuilder.h"
@@ -1282,6 +1283,24 @@ public:
                          llvm::ELF::SHF_ALLOC, /*addralign=*/4) {}
   void writeTo(uint8_t *buf) override;
   size_t getSize() const override;
+};
+
+// The Automatic Bill of Materials of the image, which is the union of the
+// bills of materials of the input files. Absent if no input carries one.
+class AbomSection final : public SyntheticSection {
+public:
+  static std::unique_ptr<AbomSection> create(Ctx &ctx);
+  AbomSection(Ctx &ctx, SmallVector<uint8_t> record)
+      : SyntheticSection(ctx, llvm::abom::SectionName, llvm::ELF::SHT_PROGBITS,
+                         /*flags=*/0, /*addralign=*/1),
+        record(std::move(record)) {}
+  void writeTo(uint8_t *buf) override {
+    memcpy(buf, record.data(), record.size());
+  }
+  size_t getSize() const override { return record.size(); }
+
+private:
+  SmallVector<uint8_t> record;
 };
 
 class PackageMetadataNote final : public SyntheticSection {

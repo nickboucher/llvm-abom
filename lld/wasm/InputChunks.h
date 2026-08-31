@@ -54,6 +54,7 @@ public:
 
   uint32_t getSize() const;
   uint32_t getInputSize() const;
+  ArrayRef<uint8_t> data() const { return rawData; }
 
   void writeTo(uint8_t *buf) const;
   void relocate(uint8_t *buf) const;
@@ -118,7 +119,6 @@ protected:
              uint32_t flags = 0)
       : name(name), file(f), alignment(alignment), flags(flags), sectionKind(k),
         live(!ctx.arg.gcSections), discarded(false) {}
-  ArrayRef<uint8_t> data() const { return rawData; }
   uint64_t getTombstone() const;
 
   ArrayRef<WasmRelocation> relocations;
