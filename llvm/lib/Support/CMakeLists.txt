@@ -252,6 +252,7 @@ add_llvm_component_library(LLVMSupport
   ScopedPrinter.cpp
   SHA1.cpp
   SHA256.cpp
+  SHAKE128.cpp
   Signposts.cpp
   SipHash.cpp
   SlowDynamicAPInt.cpp
