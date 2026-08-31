@@ -30,6 +30,7 @@
 #include "clang/Serialization/ASTWriter.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/CodeGen/MachineOptimizationRemarkEmitter.h"
 #include "llvm/Demangle/Demangle.h"
@@ -95,6 +96,26 @@ private:
   const CodeGenOptions &CodeGenOpts;
   BackendConsumer *BackendCon;
 };
+
+/// Attaches the Automatic Bill of Materials of the source files \p Hashes
+/// identifies to \p M, in the form the backend writes to the object file.
+static void addAbomMetadata(llvm::Module &M, StringRef Hashes,
+                            DiagnosticsEngine &Diags) {
+  llvm::abom::BillOfMaterials BOM;
+  BOM.insert(llvm::arrayRefFromStringRef(Hashes));
+
+  SmallVector<uint8_t> Record;
+  if (llvm::Error E = BOM.writeFilters(Record)) {
+    Diags.Report(diag::err_fe_unable_to_build_abom)
+        << llvm::toString(std::move(E));
+    return;
+  }
+
+  llvm::LLVMContext &Ctx = M.getContext();
+  M.getOrInsertNamedMetadata(llvm::abom::MetadataName)
+      ->addOperand(llvm::MDNode::get(
+          Ctx, llvm::MDString::get(Ctx, llvm::toStringRef(Record))));
+}
 
 static void reportOptRecordError(Error E, DiagnosticsEngine &Diags,
                                  const CodeGenOptions &CodeGenOpts) {
@@ -254,6 +275,12 @@ void BackendConsumer::HandleTranslationUnit(ASTContext &C) {
   // Silently ignore if we weren't initialized for some reason.
   if (!getModule())
     return;
+
+  // Record the hashes of the source files this translation unit was compiled
+  // from, from which the backend builds the Automatic Bill of Materials.
+  if (AbomCollector *Abom = CI.getAbomCollector())
+    addAbomMetadata(*getModule(), Abom->computeHashes(C.getSourceManager()),
+                    Diags);
 
   LLVMContext &Ctx = getModule()->getContext();
   std::unique_ptr<DiagnosticHandler> OldDiagnosticHandler =

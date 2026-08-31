@@ -39,6 +39,7 @@ class CompilerInvocation;
 class DiagnosticsEngine;
 class ExternalSemaSource;
 class FrontendOptions;
+class ModuleFileExtension;
 class PCHContainerReader;
 class Preprocessor;
 class PreprocessorOptions;
@@ -82,6 +83,11 @@ public:
   /// Return true if system files should be passed to sawDependency().
   virtual bool needSystemDependencies() { return false; }
 
+  /// Return true if the input files of an explicitly built module should be
+  /// passed to sawDependency(). They are not reported by default, since a
+  /// build system that passes such a module has already accounted for them.
+  virtual bool needExplicitModuleDependencies() { return false; }
+
   /// Add a dependency \p Filename if it has not been seen before and
   /// sawDependency() returns true.
   virtual void maybeAddDependency(StringRef Filename, bool FromModule,
@@ -97,6 +103,43 @@ private:
   llvm::StringSet<> Seen;
   std::vector<std::string> Dependencies;
 };
+
+/// Collects the source files that a translation unit is compiled from, and
+/// hashes them for the Automatic Bill of Materials embedded in the output.
+class AbomCollector : public DependencyCollector {
+public:
+  bool needSystemDependencies() final { return true; }
+
+  // The source files a module was built from are compiled into whatever
+  // imports it, however that module reached this compilation.
+  bool needExplicitModuleDependencies() final { return true; }
+
+  bool sawDependency(StringRef Filename, bool FromModule, bool IsSystem,
+                     bool IsModuleFile, bool IsDirectModuleImport,
+                     bool IsMissing) final;
+
+  /// Records the hashes an imported precompiled header or module was built
+  /// with, which are the hashes of the contents that were compiled into it
+  /// rather than of whatever its source files hold now.
+  void addImportedHashes(StringRef PackedHashes) {
+    ImportedHashes.append(PackedHashes);
+  }
+
+  /// Returns the concatenated ABOM hashes of the collected source files, in
+  /// the form the Automatic Bill of Materials records them. Files whose
+  /// contents are already in memory, which is the common case, are not read
+  /// from disk again.
+  std::string computeHashes(SourceManager &SM) const;
+
+private:
+  std::string ImportedHashes;
+};
+
+/// Returns the extension that carries the ABOM hashes of a precompiled header
+/// or module's source files inside the file itself, and hands the hashes of
+/// the ones it reads to \p Collector.
+std::shared_ptr<ModuleFileExtension>
+createAbomModuleFileExtension(AbomCollector &Collector);
 
 /// Builds a dependency file when attached to a Preprocessor (for includes) and
 /// ASTReader (for module imports), and writes it out at the end of processing

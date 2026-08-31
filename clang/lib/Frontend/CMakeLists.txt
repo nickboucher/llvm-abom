@@ -1,6 +1,7 @@
 add_subdirectory(Rewrite)
 
 set(LLVM_LINK_COMPONENTS
+  BinaryFormat
   BitReader
   BitstreamReader
   Option

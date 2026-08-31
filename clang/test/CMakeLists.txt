@@ -165,6 +165,8 @@ if( NOT CLANG_BUILT_STANDALONE )
     llvm-cat
     llvm-cxxfilt
     llvm-dis
+    llvm-abom-check
+    llvm-abom-hash
     llvm-dwarfdump
     llvm-ifs
     llvm-link

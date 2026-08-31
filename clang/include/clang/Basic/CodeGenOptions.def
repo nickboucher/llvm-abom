@@ -464,6 +464,11 @@ CODEGENOPT(ForceEmitVTables, 1, 0, Benign)
 /// Whether to emit an address-significance table into the object file.
 CODEGENOPT(Addrsig, 1, 0, Benign)
 
+/// Whether to emit an Automatic Bill of Materials into the object file. A
+/// module built with it carries the hashes of its own source files, so it is
+/// not benign, but a module built without them can still be used.
+CODEGENOPT(Abom, 1, 0, Compatible)
+
 /// Whether to emit unused static constants.
 CODEGENOPT(KeepStaticConsts, 1, 0, Benign)
 

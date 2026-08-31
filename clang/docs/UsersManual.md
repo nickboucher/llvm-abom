@@ -4115,6 +4115,34 @@ debugger, or `dbx`, respectively. Each of these options implies **-g**.
 tuning option must come first.)
 :::
 
+### Automatic Bill of Materials
+
+An Automatic Bill of Materials (ABOM) is a compact, queryable record of the
+source files a binary was compiled from, embedded in the binary itself. It
+allows a binary to be checked against the hash of a source file known to be
+compromised, without shipping any metadata alongside it.
+
+:::{option} -fabom
+
+Emit an Automatic Bill of Materials. Clang records the hash of every source
+file that contributes to a translation unit, including headers, and the linker
+merges those records with the ones of the libraries it links against, so that
+the result describes the entire dependency tree of the binary.
+
+A precompiled header or module carries the hashes of the source files it was
+built from, so build it with this option as well; a precompiled header and the
+compilation that uses it must agree on it.
+
+Use `llvm-abom-hash` to compute the hash of a source file and
+`llvm-abom-check` to query a binary for it. The format and the tools are
+described in [Automatic Bill of Materials](https://llvm.org/docs/ABOM.html).
+:::
+
+:::{option} -fno-abom
+
+Do not emit an Automatic Bill of Materials. This is the default.
+:::
+
 ### Controlling LLVM IR Output
 
 #### Controlling Value Names in LLVM IR

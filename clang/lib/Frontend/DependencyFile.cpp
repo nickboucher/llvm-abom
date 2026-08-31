@@ -20,8 +20,12 @@
 #include "clang/Lex/ModuleMap.h"
 #include "clang/Lex/PPCallbacks.h"
 #include "clang/Lex/Preprocessor.h"
+#include "clang/Serialization/ASTBitCodes.h"
 #include "clang/Serialization/ASTReader.h"
+#include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/BinaryFormat/ABOM.h"
+#include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -171,7 +175,8 @@ struct DepCollectorASTListener : public ASTReaderListener {
   }
   bool visitInputFile(StringRef Filename, bool IsSystem,
                       bool IsOverridden, bool IsExplicitModule) override {
-    if (IsOverridden || IsExplicitModule)
+    if (IsOverridden ||
+        (IsExplicitModule && !DepCollector.needExplicitModuleDependencies()))
       return true;
 
     // Run this through the FileManager in order to respect 'use-external-name'
@@ -238,6 +243,144 @@ void DependencyCollector::attachToPreprocessor(Preprocessor &PP) {
 void DependencyCollector::attachToASTReader(ASTReader &R) {
   R.addListener(
       std::make_unique<DepCollectorASTListener>(*this, R.getFileManager()));
+}
+
+bool AbomCollector::sawDependency(StringRef Filename, bool FromModule,
+                                  bool IsSystem, bool IsModuleFile,
+                                  bool IsDirectModuleImport, bool IsMissing) {
+  // A missing file has no contents to hash, and a module file is a build
+  // artifact whose own inputs are reported separately.
+  if (IsMissing || IsModuleFile)
+    return false;
+  return DependencyCollector::sawDependency(Filename, FromModule, IsSystem,
+                                            IsModuleFile, IsDirectModuleImport,
+                                            IsMissing);
+}
+
+namespace {
+/// Carries the ABOM hashes of the source files a precompiled header or module
+/// was built from inside the file itself.
+///
+/// The source files of a module are compiled into whatever imports it, so they
+/// belong in the bill of materials of the importing object. Hashing them from
+/// disk when the module is imported would record whatever they hold then; the
+/// hashes stored here are of the contents that were compiled.
+class AbomModuleFileExtension
+    : public llvm::RTTIExtends<AbomModuleFileExtension, ModuleFileExtension> {
+public:
+  static char ID;
+
+  AbomModuleFileExtension(AbomCollector &Collector) : Collector(Collector) {}
+
+  ModuleFileExtensionMetadata getExtensionMetadata() const override {
+    return {std::string(llvm::abom::MetadataName), 1, 0, "ABOM source hashes"};
+  }
+
+  std::unique_ptr<ModuleFileExtensionWriter>
+  createExtensionWriter(ASTWriter &Writer) override;
+
+  std::unique_ptr<ModuleFileExtensionReader>
+  createExtensionReader(const ModuleFileExtensionMetadata &Metadata,
+                        ASTReader &Reader, serialization::ModuleFile &Mod,
+                        const llvm::BitstreamCursor &Stream) override;
+
+  AbomCollector &Collector;
+};
+
+char AbomModuleFileExtension::ID = 0;
+
+class AbomExtensionWriter : public ModuleFileExtensionWriter {
+public:
+  AbomExtensionWriter(AbomModuleFileExtension *Ext)
+      : ModuleFileExtensionWriter(Ext) {}
+
+  void writeExtensionContents(Sema &SemaRef,
+                              llvm::BitstreamWriter &Stream) override {
+    auto Abv = std::make_shared<llvm::BitCodeAbbrev>();
+    Abv->Add(llvm::BitCodeAbbrevOp(serialization::FIRST_EXTENSION_RECORD_ID));
+    Abv->Add(llvm::BitCodeAbbrevOp(llvm::BitCodeAbbrevOp::Blob));
+    unsigned Abbrev = Stream.EmitAbbrev(std::move(Abv));
+
+    // The hashes of every source file this file was built from, including
+    // those of the modules it imports, so that one record describes the whole
+    // of what a reader compiles.
+    std::string Hashes = cast<AbomModuleFileExtension>(getExtension())
+                             ->Collector.computeHashes(
+                                 SemaRef.getSourceManager());
+    uint64_t Record[] = {serialization::FIRST_EXTENSION_RECORD_ID};
+    Stream.EmitRecordWithBlob(Abbrev, Record, Hashes);
+  }
+};
+
+class AbomExtensionReader : public ModuleFileExtensionReader {
+public:
+  AbomExtensionReader(AbomModuleFileExtension *Ext,
+                      llvm::BitstreamCursor Stream)
+      : ModuleFileExtensionReader(Ext) {
+    while (true) {
+      llvm::Expected<llvm::BitstreamEntry> Entry =
+          Stream.advanceSkippingSubblocks();
+      if (!Entry) {
+        consumeError(Entry.takeError());
+        return;
+      }
+      if (Entry->Kind != llvm::BitstreamEntry::Record)
+        return;
+
+      SmallVector<uint64_t, 1> Record;
+      StringRef Blob;
+      llvm::Expected<unsigned> Code =
+          Stream.readRecord(Entry->ID, Record, &Blob);
+      if (!Code) {
+        consumeError(Code.takeError());
+        return;
+      }
+      if (*Code == serialization::FIRST_EXTENSION_RECORD_ID &&
+          Blob.size() % llvm::abom::HashSize == 0)
+        Ext->Collector.addImportedHashes(Blob);
+    }
+  }
+};
+} // end anonymous namespace
+
+std::unique_ptr<ModuleFileExtensionWriter>
+AbomModuleFileExtension::createExtensionWriter(ASTWriter &Writer) {
+  return std::make_unique<AbomExtensionWriter>(this);
+}
+
+std::unique_ptr<ModuleFileExtensionReader>
+AbomModuleFileExtension::createExtensionReader(
+    const ModuleFileExtensionMetadata &Metadata, ASTReader &Reader,
+    serialization::ModuleFile &Mod, const llvm::BitstreamCursor &Stream) {
+  return std::make_unique<AbomExtensionReader>(this, Stream);
+}
+
+std::shared_ptr<ModuleFileExtension>
+clang::createAbomModuleFileExtension(AbomCollector &Collector) {
+  return std::make_shared<AbomModuleFileExtension>(Collector);
+}
+
+std::string AbomCollector::computeHashes(SourceManager &SM) const {
+  std::string Hashes = ImportedHashes;
+  Hashes.reserve(Hashes.size() +
+                 getDependencies().size() * llvm::abom::HashSize);
+
+  // Distinct dependencies can name the same file, for instance through a
+  // symbolic link, in which case they share a buffer.
+  llvm::SmallPtrSet<const char *, 32> Seen;
+  for (StringRef Filename : getDependencies()) {
+    OptionalFileEntryRef File =
+        SM.getFileManager().getOptionalFileRef(Filename);
+    if (!File)
+      continue;
+    std::optional<llvm::MemoryBufferRef> Buffer =
+        SM.getMemoryBufferForFileOrNone(*File);
+    if (!Buffer || !Seen.insert(Buffer->getBufferStart()).second)
+      continue;
+    llvm::abom::Hash H = llvm::abom::computeHash(Buffer->getBuffer());
+    Hashes.append(H.begin(), H.end());
+  }
+  return Hashes;
 }
 
 DependencyFileGenerator::DependencyFileGenerator(

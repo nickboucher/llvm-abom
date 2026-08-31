@@ -8537,6 +8537,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("-fmv");
   }
 
+  Args.addOptInFlag(CmdArgs, options::OPT_fabom, options::OPT_fno_abom);
+
   if (Args.hasFlag(options::OPT_faddrsig, options::OPT_fno_addrsig,
                    (TC.getTriple().isOSBinFormatELF() ||
                     TC.getTriple().isOSBinFormatCOFF()) &&

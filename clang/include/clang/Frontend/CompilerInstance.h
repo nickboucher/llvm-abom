@@ -153,6 +153,10 @@ class CompilerInstance : public ModuleLoader {
 
   std::vector<std::shared_ptr<DependencyCollector>> DependencyCollectors;
 
+  /// The collector of source file hashes for the Automatic Bill of Materials,
+  /// if one is being emitted.
+  std::shared_ptr<AbomCollector> TheAbomCollector;
+
   /// The set of modules that failed to build.
   ///
   /// This value will be passed among all of the compiler instances created
@@ -994,6 +998,10 @@ public:
   }
 
   void clearDependencyCollectors() { DependencyCollectors.clear(); }
+
+  /// Returns the collector of source file hashes for the Automatic Bill of
+  /// Materials, or null if none is being emitted.
+  AbomCollector *getAbomCollector() const { return TheAbomCollector.get(); }
 
   std::vector<std::shared_ptr<DependencyCollector>> &getDependencyCollectors() {
     return DependencyCollectors;

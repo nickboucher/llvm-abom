@@ -49,6 +49,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/BinaryFormat/ABOM.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Plugins/PassPlugin.h"
 #include "llvm/Support/AdvisoryLock.h"
@@ -515,6 +516,20 @@ void CompilerInstance::createPreprocessor(TranslationUnitKind TUKind) {
   const DependencyOutputOptions &DepOpts = getDependencyOutputOpts();
   if (!DepOpts.OutputFile.empty())
     addDependencyCollector(std::make_shared<DependencyFileGenerator>(DepOpts));
+  if (getCodeGenOpts().Abom) {
+    TheAbomCollector = std::make_shared<AbomCollector>();
+    addDependencyCollector(TheAbomCollector);
+    // A module built by this compilation inherits its options, so replace any
+    // extension it inherited with one bound to this instance's collector.
+    std::vector<std::shared_ptr<ModuleFileExtension>> &Extensions =
+        getFrontendOpts().ModuleFileExtensions;
+    llvm::erase_if(Extensions,
+                   [](const std::shared_ptr<ModuleFileExtension> &Ext) {
+                     return Ext->getExtensionMetadata().BlockName ==
+                            llvm::abom::MetadataName;
+                   });
+    Extensions.push_back(createAbomModuleFileExtension(*TheAbomCollector));
+  }
   if (!DepOpts.DOTOutputFile.empty())
     AttachDependencyGraphGen(*PP, DepOpts.DOTOutputFile,
                              getHeaderSearchOpts().Sysroot);

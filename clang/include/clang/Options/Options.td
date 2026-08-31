@@ -2128,6 +2128,14 @@ defm lifetime_safety_tu_analysis
                             "end, analyzing functions in call graph post-order "
                             "to best propagate inferred annotations">>;
 
+defm abom : BoolFOption<"abom",
+  CodeGenOpts<"Abom">, DefaultFalse,
+  PosFlag<SetTrue, [], [ClangOption, CC1Option], "Emit">,
+  NegFlag<SetFalse, [], [ClangOption], "Don't emit">,
+  BothFlags<[], [ClangOption, CLOption],
+          " an Automatic Bill of Materials, a queryable record of the source "
+          "files the output was compiled from">>;
+
 defm addrsig : BoolFOption<"addrsig",
   CodeGenOpts<"Addrsig">, DefaultFalse,
   PosFlag<SetTrue, [], [ClangOption, CC1Option], "Emit">,
